@@ -1,0 +1,12 @@
+# Store data: every tenant's uploaded files stay on the server, never in git
+uploads/*
+!uploads/.htaccess
+
+# Local helper / scratch scripts
+_*.php
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
