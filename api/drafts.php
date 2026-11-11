@@ -26,6 +26,9 @@ switch ($action) {
             $id = t_exec("INSERT INTO draft_orders (customer_id, currency, tags, note, discount_type, discount_value, discount_reason, shipping_title, shipping_amount, payment_due_later, payment_terms, shipping_address_json, updated_by, po_number, number) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [...$vals, $num]);
             timeline_add('draft', $id, 'You created this draft order.');
         }
+        $companyId = !empty($in['company_id']) ? (int)$in['company_id'] : null;
+        if ($companyId && !t_val("SELECT id FROM companies WHERE id=?", [$companyId])) $companyId = null;
+        t_exec("UPDATE draft_orders SET company_id=? WHERE id=?", [$companyId, $id]);
         foreach ($items as $it) {
             $qty = max(1, (int)($it['quantity'] ?? 1));
             $price = max(0, (float)($it['price'] ?? 0));

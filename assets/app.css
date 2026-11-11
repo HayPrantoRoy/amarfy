@@ -544,3 +544,29 @@ table.grid{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 .ai-empty{background:#f7f7f7;border-radius:12px;padding:14px;line-height:1.6}
 .listening{color:#c70a24!important;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.4}}
+/* reusable line chart */
+.lc{position:relative}
+.lc svg{display:block;width:100%;height:auto}
+.lc-grid line{stroke:#ececec}
+.lc-y,.lc-x{fill:#4a4a4a;font-size:12.5px;font-family:Inter,sans-serif}
+.lc-tip{position:absolute;pointer-events:none;background:#fff;border:1px solid #e3e3e3;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.12);padding:8px 10px;font-size:12.5px;white-space:nowrap;transform:translate(-50%,-115%);z-index:2}
+.lc-tip .r{display:flex;align-items:center;gap:8px;margin-top:2px}.lc-tip b{margin-left:auto;padding-left:14px}
+.lc-tip i,.lc-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.lc-legend{display:flex;justify-content:center;gap:24px;margin-top:10px;font-size:13px;color:#303030}
+.lc-legend span{display:inline-flex;align-items:center;gap:8px}
+/* growth */
+.gr-hero{display:flex;align-items:center;gap:30px;padding:10px 0 26px;position:relative}
+.gr-hero h1{font-size:30px;font-weight:600;letter-spacing:-.5px;margin-bottom:10px}
+.gr-hero p{font-size:15px;color:#303030;max-width:640px;line-height:1.55}
+.gr-hero .dismiss{position:absolute;top:0;right:0}
+.gr-stack{display:flex;height:76px;gap:2px;margin-top:26px}
+.gr-stack div{border-radius:4px;min-width:4px}
+.gr-legend{display:flex;gap:26px;flex-wrap:wrap}
+.gr-legend span{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#4a4a4a}
+.gr-legend b{color:#1a1a1a;font-weight:500}
+.gr-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px}
+.gr-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px;align-items:stretch}
+.gr-cards>.card+.card{margin-top:0}
+.gr-card{min-height:230px;display:flex;flex-direction:column}
+.gr-card .big{font-size:28px;font-weight:550;margin-top:auto}
+@media (max-width:980px){.gr-cards{grid-template-columns:1fr}}

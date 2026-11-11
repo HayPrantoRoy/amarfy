@@ -57,7 +57,29 @@ final class DB
         $db = $_SESSION['db_name'] ?? '';
         if (!preg_match('/^[a-z0-9_]+$/', $db)) throw new RuntimeException('No tenant database in session');
         self::$tenant = self::connect($db);
+        self::migrate(self::$tenant);
         return self::$tenant;
+    }
+
+    /** Bring an existing tenant DB up to the current schema (idempotent, runs once per version). */
+    public static function migrate(mysqli $t): void
+    {
+        $r = $t->query("SELECT v FROM settings WHERE k='schema_version'");
+        $ver = (int)(($r && ($row = $r->fetch_assoc())) ? $row['v'] : 1);
+        if ($ver >= 2) return;
+        self::runSqlFile($t, APP_ROOT . '/database/migrations/002_growth_b2b.sql');
+        $cols = fn(string $tbl) => array_column($t->query("SHOW COLUMNS FROM `$tbl`")->fetch_all(MYSQLI_ASSOC), 'Field');
+        if (!in_array('source', $cols('orders'), true)) $t->query("ALTER TABLE orders ADD `source` VARCHAR(20) NOT NULL DEFAULT 'direct', ADD `campaign_id` INT UNSIGNED NULL, ADD `company_id` INT UNSIGNED NULL");
+        if (!in_array('company_id', $cols('draft_orders'), true)) $t->query("ALTER TABLE draft_orders ADD `company_id` INT UNSIGNED NULL");
+        if ((int)$t->query("SELECT COUNT(*) c FROM segments")->fetch_assoc()['c'] === 0) {
+            $t->query("INSERT INTO segments (name, rule_key, rules_json) VALUES
+              ('Customers who have purchased at least once','purchased_once',NULL),
+              ('Email subscribers','email_subscribers',NULL),
+              ('Abandoned checkouts in the last 30 days','abandoned_30',NULL),
+              ('Customers who have purchased more than once','purchased_more_than_once',NULL),
+              ('Customers who haven''t purchased','never_purchased',NULL)");
+        }
+        $t->query("INSERT INTO settings (k, v) VALUES ('schema_version','2') ON DUPLICATE KEY UPDATE v='2'");
     }
 
     public static function runSqlFile(mysqli $conn, string $path): void

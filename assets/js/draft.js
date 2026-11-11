@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function pick() {
     return {items: S.items, customer_id: S.customer ? S.customer.id : null, shipping_address: S.shipping_address, tags: S.tags, note: S.note, po_number: S.po_number,
       discount_type: S.discount_type, discount_value: S.discount_value, discount_reason: S.discount_reason, shipping_title: S.shipping_title, shipping_amount: S.shipping_amount,
-      payment_due_later: S.payment_due_later, payment_terms: S.payment_terms};
+      payment_due_later: S.payment_due_later, payment_terms: S.payment_terms, company_id: S.company_id || null};
   }
   function dirty() {
     if (readOnly) return;

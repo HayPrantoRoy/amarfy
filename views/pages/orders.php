@@ -14,6 +14,10 @@ switch ($view) {
     default: $where[] = "o.archived=0";
 }
 if ($loc) { $where[] = 'o.location_id=?'; $p[] = $loc; }
+if (!empty($_GET['company'])) {   // orders for a B2B company (linked directly or placed by one of its contacts)
+    $cids = company_customer_ids((int)$_GET['company']);
+    $where[] = '(o.company_id=? OR o.customer_id IN (' . ($cids ? implode(',', $cids) : '0') . '))'; $p[] = (int)$_GET['company'];
+}
 if ($q !== '') { $where[] = "(o.number LIKE ? OR CONCAT(c.first_name,' ',c.last_name) LIKE ? OR c.email LIKE ? OR o.tags LIKE ?)"; array_push($p, ltrim($q, '#') . '%', "%$q%", "%$q%", "%$q%"); }
 $order = ['date' => 'o.created_at', 'number' => 'o.number', 'total' => 'o.total', 'customer' => 'c.first_name'][$sort];
 $rows = t_rows("SELECT o.*, c.first_name, c.last_name, c.email, (SELECT COALESCE(SUM(quantity),0) FROM order_items i WHERE i.order_id=o.id) items

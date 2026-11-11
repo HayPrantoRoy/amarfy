@@ -168,4 +168,12 @@ function empty_state(string $svg, string $title, string $text, string $btn = '',
     return '<div class="empty-state">' . $svg . '<h3>' . h($title) . '</h3><p>' . h($text) . '</p>' .
         ($btn ? '<a class="btn primary" href="' . h(url($href)) . '">' . h($btn) . '</a>' : '') . '</div>';
 }
+/** Previous / next record arrows. A missing neighbour renders as a disabled, non-link control. */
+function prev_next(string $base, $prev, $next): string
+{
+    $b = fn($id, $ic, $label) => $id
+        ? '<a class="btn" href="' . h(url($base . '/' . $id)) . '" aria-label="' . $label . '">' . icon($ic) . '</a>'
+        : '<span class="btn disabled" aria-disabled="true" aria-label="' . $label . '">' . icon($ic) . '</span>';
+    return '<span class="btn-group">' . $b($prev, 'chev-up', 'Previous') . $b($next, 'chev-down', 'Next') . '</span>';
+}
 function learn_more(string $t): string { return '<div class="learn-more"><button type="button" class="link-btn" data-help="' . h($t) . '">Learn more about ' . h($t) . '</button></div>'; }

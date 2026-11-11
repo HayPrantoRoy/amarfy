@@ -6,6 +6,10 @@ $sort = in_array($_GET['sort'] ?? '', ['date', 'number', 'total'], true) ? $_GET
 $dir = ($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
 $where = ['1=1']; $p = [];
 if (in_array($view, ['open', 'invoice_sent', 'completed'], true)) { $where[] = 'd.status=?'; $p[] = $view; }
+if (!empty($_GET['company'])) {
+    $cids = company_customer_ids((int)$_GET['company']);
+    $where[] = "d.status<>'completed' AND (d.company_id=? OR d.customer_id IN (" . ($cids ? implode(',', $cids) : '0') . "))"; $p[] = (int)$_GET['company'];
+}
 if ($q !== '') { $where[] = "(d.number LIKE ? OR CONCAT(c.first_name,' ',c.last_name) LIKE ? OR d.po_number LIKE ?)"; array_push($p, preg_replace('/^#?d/i', '', $q) . '%', "%$q%", "%$q%"); }
 $ob = ['date' => 'd.created_at', 'number' => 'd.number', 'total' => 'd.id'][$sort];
 $rows = t_rows("SELECT d.*, c.first_name, c.last_name, c.email, c.company FROM draft_orders d LEFT JOIN customers c ON c.id=d.customer_id WHERE " . implode(' AND ', $where) . " ORDER BY $ob $dir LIMIT 250", $p);

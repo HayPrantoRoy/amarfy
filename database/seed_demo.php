@@ -245,7 +245,37 @@ foreach ([[5, 4350, 3], [9, 1850, 1], [null, 6500, 0]] as [$ci, $tot, $days])
     t_exec("INSERT INTO checkouts (customer_id, email, total, email_status, created_at) VALUES (?,?,?,?,?)",
         [$ci !== null ? $C[$ci] : null, $ci !== null ? null : 'guest.shopper@example.com', $tot, $days ? 'Sent' : 'Scheduled', date('Y-m-d H:i:s', strtotime("-$days days -3 hours"))]);
 
-set_setting('sessions_30d', '1248');
+/* ---------------- B2B companies ---------------- */
+$co1 = t_exec("INSERT INTO companies (name, external_id, ordering_approved, main_contact_id, note, created_at) VALUES (?,?,?,?,?,?)",
+    ['Ahmed Traders', 'AT-1001', 1, $C[3], 'Wholesale buyer for Chattogram stores. Prefers bulk panjabi orders before Eid.', date('Y-m-d H:i:s', strtotime('-2 years'))]);
+t_exec("INSERT INTO company_contacts (company_id, customer_id) VALUES (?,?)", [$co1, $C[3]]);
+t_exec("INSERT INTO company_locations (company_id, name, address, city, payment_terms, checkout_mode) VALUES (?,?,?,?,?,?)", [$co1, 'Agrabad Branch', '45 Agrabad Commercial Area', 'Chattogram', 'net_15', 'auto']);
+$co2 = t_exec("INSERT INTO companies (name, external_id, ordering_approved, main_contact_id, note, created_at) VALUES (?,?,?,?,?,?)",
+    ['Chowdhury Fashion House', 'CFH-22', 1, $C[7], 'Boutique chain, 3 outlets in Dhaka.', date('Y-m-d H:i:s', strtotime('-8 months'))]);
+t_exec("INSERT INTO company_contacts (company_id, customer_id) VALUES (?,?)", [$co2, $C[7]]);
+t_exec("INSERT INTO company_locations (company_id, name, address, city, payment_terms, checkout_mode) VALUES (?,?,?,?,?,?)", [$co2, 'Mirpur DOHS', 'Plot 9, Mirpur DOHS', 'Dhaka', 'net_30', 'review']);
+$co3 = t_exec("INSERT INTO companies (name, ordering_approved, note) VALUES (?,?,?)", ['Sylhet Tea Gifts Ltd', 0, 'Awaiting trade licence before approval.']);
+t_exec("INSERT INTO company_locations (company_id, name, city) VALUES (?,?,?)", [$co3, 'Sylhet Office', 'Sylhet']);
+t_exec("UPDATE orders SET company_id=? WHERE customer_id=?", [$co1, $C[3]]);
+t_exec("UPDATE orders SET company_id=? WHERE customer_id=?", [$co2, $C[7]]);
+
+/* ---------------- marketing: campaigns, order sources, daily traffic ---------------- */
+$camp1 = t_exec("INSERT INTO campaigns (name, channel, status, goal, budget, utm_campaign, starts_on, ends_on) VALUES (?,?,?,?,?,?,?,?)",
+    ['Eid Collection launch', 'social', 'active', 'Sell Eid panjabi and saree stock', 15000, 'eid-collection-launch', date('Y-m-d', strtotime('-30 days')), date('Y-m-d', strtotime('+10 days'))]);
+$camp2 = t_exec("INSERT INTO campaigns (name, channel, status, goal, budget, utm_campaign, starts_on, ends_on) VALUES (?,?,?,?,?,?,?,?)",
+    ['VIP win-back email', 'email', 'completed', 'Bring back customers inactive for 60 days', 2000, 'vip-win-back', date('Y-m-d', strtotime('-25 days')), date('Y-m-d', strtotime('-11 days'))]);
+$srcs = ['social', 'email', 'direct', 'search', 'direct', 'social', 'email', 'direct', 'search', 'direct', 'social', 'direct', 'direct'];
+foreach (t_rows("SELECT id FROM orders ORDER BY id") as $i => $o) {
+    $s = $srcs[$i % count($srcs)];
+    t_exec("UPDATE orders SET source=?, campaign_id=? WHERE id=?", [$s, $s === 'social' ? $camp1 : ($s === 'email' ? $camp2 : null), (int)$o['id']]);
+}
+for ($i = 0; $i < 60; $i++) {
+    $day = date('Y-m-d', strtotime("-$i days"));
+    foreach (['direct' => [18, 46], 'organic' => [4, 15], 'social' => [6, 22], 'email' => [1, 8], 'referral' => [0, 5]] as $src => [$lo, $hi])
+        t_exec("INSERT INTO traffic_daily (day, source, sessions) VALUES (?,?,?) ON DUPLICATE KEY UPDATE sessions=VALUES(sessions)", [$day, $src, random_int($lo, $hi)]);
+}
+$sess = (int)t_val("SELECT COALESCE(SUM(sessions),0) FROM traffic_daily WHERE day >= CURDATE() - INTERVAL 29 DAY");
+set_setting('sessions_30d', (string)$sess);
 set_setting('demo_seeded', date('c'));
 $n = fn($t) => t_val("SELECT COUNT(*) FROM $t");
 echo "Seeded $db: {$n('products')} products, {$n('customers')} customers, {$n('orders')} orders, {$n('draft_orders')} drafts, {$n('collections')} collections, {$n('purchase_orders')} POs, {$n('transfers')} transfers, {$n('gift_cards')} gift cards\n";

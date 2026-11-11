@@ -45,7 +45,7 @@ $state = [
 ];
 $actions = '';
 if ($p) $actions = '<button class="btn" id="pViewAs" type="button">' . icon('eye') . 'View as</button><button class="btn" id="pPreview" type="button">Preview</button><button class="btn" id="pShare" type="button">Share</button><button class="btn" id="pMore" type="button">More actions ' . icon('chev-down') . '</button>'
-    . '<span class="btn-group"><a class="btn' . ($state['prev'] ? '' : ' disabled') . '" href="' . h(url('products/' . $state['prev'])) . '">' . icon('chev-up') . '</a><a class="btn' . ($state['next'] ? '' : ' disabled') . '" href="' . h(url('products/' . $state['next'])) . '">' . icon('chev-down') . '</a></span>';
+    . prev_next('products', $state['prev'], $state['next']);
 echo topbar('products', [['Products', 'products'], [$p ? $p['title'] : 'Add product', null]], $actions, $state['from_inventory'] ? 'products/inventory' : 'products');
 ?>
 <div class="form-layout" id="productApp">

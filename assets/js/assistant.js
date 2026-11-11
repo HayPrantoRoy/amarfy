@@ -100,6 +100,9 @@
     'purchase orders': 'Purchase orders track stock you buy from suppliers. Mark a purchase order as ordered to show incoming stock, then receive items to add them to inventory at the destination.',
     'transfers': 'Transfers move stock between your locations. Marking a transfer in transit removes the stock from the origin; receiving it adds the stock at the destination.',
     'gift cards': 'Gift cards are store credit with a unique code. Issue them to customers, set an expiry date if needed, adjust the balance, or disable a card that should no longer be used.',
+    'segments': 'Segments group customers by rules such as number of orders, amount spent, city, tags or email subscription. Default segments update automatically; create your own to target promotions or follow-ups.',
+    'companies': 'Companies let you sell B2B. Add the business, its contacts and locations, set payment terms and checkout rules, then create orders from the company page so they are linked to it.',
+    'marketing': 'Growth shows how much of your sales come from marketing. Orders tagged with a marketing source or linked to a campaign count as attributed sales. Create campaigns to track results, or turn on Autopilot for a channel.',
     'customers': 'Customer profiles keep contact details, addresses, notes and order history together. Customers are created automatically from orders, or you can add them yourself.',
   };
   function help(topic) {

@@ -9,6 +9,12 @@ if (is_int($id)) {
         if ($c) $customer = ['id' => (int)$c['id'], 'name' => customer_name($c), 'first_name' => $c['first_name'], 'last_name' => $c['last_name'], 'email' => $c['email'], 'phone' => $c['phone'], 'company' => $c['company'], 'address1' => $c['address1'], 'address2' => $c['address2'], 'city' => $c['city'], 'zip' => $c['zip'], 'country' => $c['country'], 'orders_count' => (int)$c['orders_count']];
     }
 }
+// "Create order" from a company or customer page pre-selects the customer and links the company
+if (!$draft && !empty($_GET['customer'])) {
+    $c = t_row("SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.customer_id=c.id) orders_count FROM customers c WHERE id=?", [(int)$_GET['customer']]);
+    if ($c) $customer = ['id' => (int)$c['id'], 'name' => customer_name($c), 'first_name' => $c['first_name'], 'last_name' => $c['last_name'], 'email' => $c['email'], 'phone' => $c['phone'], 'company' => $c['company'], 'address1' => $c['address1'], 'address2' => $c['address2'], 'city' => $c['city'], 'zip' => $c['zip'], 'country' => $c['country'], 'orders_count' => (int)$c['orders_count']];
+}
+$companyId = $draft['company_id'] ?? (!empty($_GET['company']) && t_val("SELECT id FROM companies WHERE id=?", [(int)$_GET['company']]) ? (int)$_GET['company'] : null);
 $PAGE_TITLE = $draft ? '#D' . $draft['number'] : 'Create order';
 $state = [
     'id' => $draft ? (int)$draft['id'] : 0,
@@ -19,6 +25,7 @@ $state = [
     'updated' => $draft ? 'Updated by ' . ($draft['updated_by'] ?: staff_name()) . ' ' . lcfirst(friendly_date($draft['updated_at'])) : '',
     'items' => array_map(fn($i) => ['variant_id' => $i['variant_id'] ? (int)$i['variant_id'] : null, 'product_id' => $i['product_id'], 'title' => $i['title'], 'variant_title' => $i['variant_title'], 'image' => $i['image'], 'price' => (float)$i['price'], 'quantity' => (int)$i['quantity'], 'taxable' => (int)$i['taxable'], 'requires_shipping' => (int)$i['requires_shipping']], $items),
     'customer' => $customer,
+    'company_id' => $companyId ? (int)$companyId : null,
     'shipping_address' => $draft && $draft['shipping_address_json'] ? json_decode($draft['shipping_address_json'], true) : null,
     'tags' => $draft ? array_values(array_filter(explode(',', (string)$draft['tags']))) : [],
     'note' => $draft['note'] ?? '',
@@ -38,7 +45,7 @@ $state = [
 $actions = '';
 if ($draft) {
     $actions = '<button class="btn" id="dDuplicate" type="button">Duplicate</button><button class="btn" id="dShare" type="button">Share</button><button class="btn" id="dMore" type="button">More actions ' . icon('chev-down') . '</button>'
-        . '<span class="btn-group"><a class="btn' . ($state['prev'] ? '' : ' disabled') . '" href="' . h(url('draft_orders/' . $state['prev'])) . '">' . icon('chev-up') . '</a><a class="btn' . ($state['next'] ? '' : ' disabled') . '" href="' . h(url('draft_orders/' . $state['next'])) . '">' . icon('chev-down') . '</a></span>';
+        . prev_next('draft_orders', $state['prev'], $state['next']);
 }
 echo topbar('drafts', $draft ? [['Drafts', 'draft_orders'], ['#D' . $draft['number'], null]] : [['Drafts', 'draft_orders']], $actions, 'draft_orders');
 ?>

@@ -8,7 +8,7 @@ $addr = json_decode((string)$o['shipping_address_json'], true) ?: ($c ? $c : nul
 $count = array_sum(array_map(fn($i) => (int)$i['quantity'], $items));
 $prev = t_val("SELECT id FROM orders WHERE id < ? ORDER BY id DESC LIMIT 1", [$id]);
 $next = t_val("SELECT id FROM orders WHERE id > ? ORDER BY id LIMIT 1", [$id]);
-$nav = '<span class="btn-group"><a class="btn' . ($prev ? '' : ' disabled') . '" href="' . h(url('orders/' . $prev)) . '">' . icon('chev-up') . '</a><a class="btn' . ($next ? '' : ' disabled') . '" href="' . h(url('orders/' . $next)) . '">' . icon('chev-down') . '</a></span>';
+$nav = prev_next('orders', $prev, $next);
 echo topbar('orders', [['Orders', 'orders'], ['#' . $o['number'], null]],
     '<button class="btn" id="oPrint" type="button">Print</button><button class="btn" id="oMore" type="button">More actions ' . icon('chev-down') . '</button>' . $nav, 'orders');
 ?>

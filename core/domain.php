@@ -88,6 +88,7 @@ function draft_to_order(int $draftId, string $paymentStatus): int
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [$num, $d['customer_id'], $draftId, $loc, 'Draft Orders', $d['currency'], $t['subtotal'], $t['discount'], $t['shipping'], $t['total'], $paymentStatus,
          $d['shipping_title'] ?: 'Standard shipping', $d['payment_terms'], $fulfillBy, $d['tags'], $d['note'], $d['shipping_address_json']]);
+    t_exec("UPDATE orders SET company_id=?, source='draft' WHERE id=?", [$d['company_id'] ?? null, $oid]);
     foreach ($items as $i) {
         t_exec("INSERT INTO order_items (order_id, variant_id, product_id, title, variant_title, image, price, quantity) VALUES (?,?,?,?,?,?,?,?)",
             [$oid, $i['variant_id'], $i['product_id'], $i['title'], $i['variant_title'], $i['image'], $i['price'], $i['quantity']]);
@@ -158,4 +159,99 @@ function collection_product_ids(array $c): array
 function payment_terms_options(): array
 {
     return ['receipt' => 'Due on receipt', 'fulfillment' => 'Due on fulfillment', 'net_7' => 'Within 7 days', 'net_15' => 'Within 15 days', 'net_30' => 'Within 30 days', 'net_45' => 'Within 45 days', 'net_60' => 'Within 60 days', 'net_90' => 'Within 90 days'];
+}
+
+/* ---------------- customer segments ---------------- */
+function segment_fields(): array
+{
+    return [
+        'orders_count' => ['Number of orders', 'number'], 'amount_spent' => ['Amount spent', 'number'],
+        'city' => ['City', 'text'], 'country' => ['Country', 'text'], 'tag' => ['Customer tag', 'text'],
+        'accepts_marketing' => ['Email subscription', 'bool'], 'days_since_created' => ['Days since created', 'number'],
+        'last_order_days' => ['Days since last order', 'number'], 'company' => ['Company', 'text'],
+    ];
+}
+/** Customer ids matching a segment (built-in rule_key or custom rules). */
+function segment_customer_ids(array $seg): array
+{
+    $base = "SELECT c.id FROM customers c";
+    $orders = "(SELECT COUNT(*) FROM orders o WHERE o.customer_id=c.id AND o.cancelled_at IS NULL)";
+    switch ($seg['rule_key'] ?? '') {
+        case 'purchased_once': $sql = "$base WHERE $orders >= 1"; break;
+        case 'email_subscribers': $sql = "$base WHERE c.accepts_marketing=1"; break;
+        case 'abandoned_30': $sql = "$base WHERE EXISTS (SELECT 1 FROM checkouts k WHERE k.customer_id=c.id AND k.completed=0 AND k.created_at >= NOW() - INTERVAL 30 DAY)"; break;
+        case 'purchased_more_than_once': $sql = "$base WHERE $orders > 1"; break;
+        case 'never_purchased': $sql = "$base WHERE $orders = 0"; break;
+        default:
+            $rules = json_decode((string)($seg['rules_json'] ?? '[]'), true) ?: [];
+            if (!$rules) return [];
+            $parts = []; $p = [];
+            foreach ($rules as $r) {
+                $f = $r['field'] ?? ''; $op = $r['op'] ?? 'eq'; $v = (string)($r['value'] ?? '');
+                $col = match ($f) {
+                    'orders_count' => $orders,
+                    'amount_spent' => "(SELECT COALESCE(SUM(total),0) FROM orders o WHERE o.customer_id=c.id AND o.cancelled_at IS NULL)",
+                    'city' => 'c.city', 'country' => 'c.country', 'tag' => 'c.tags', 'company' => 'c.company',
+                    'accepts_marketing' => 'c.accepts_marketing',
+                    'days_since_created' => 'DATEDIFF(NOW(), c.created_at)',
+                    'last_order_days' => "DATEDIFF(NOW(), (SELECT MAX(created_at) FROM orders o WHERE o.customer_id=c.id))",
+                    default => null,
+                };
+                if (!$col) continue;
+                if ($f === 'tag') { $parts[] = ($op === 'neq' ? 'NOT ' : '') . "FIND_IN_SET(?, REPLACE(COALESCE(c.tags,''), ', ', ','))"; $p[] = $v; continue; }
+                if ($f === 'accepts_marketing') { $parts[] = "$col = ?"; $p[] = in_array(strtolower($v), ['1', 'yes', 'true', 'subscribed'], true) ? 1 : 0; continue; }
+                [$sqlop, $val] = match ($op) {
+                    'gt' => ['> ?', (float)$v], 'lt' => ['< ?', (float)$v], 'gte' => ['>= ?', (float)$v], 'lte' => ['<= ?', (float)$v],
+                    'neq' => ['<> ?', $v], 'contains' => ['LIKE ?', "%$v%"], default => ['= ?', $v],
+                };
+                $parts[] = "COALESCE($col, " . (segment_fields()[$f][1] === 'number' ? '0' : "''") . ") $sqlop"; $p[] = $val;
+            }
+            if (!$parts) return [];
+            return array_map('intval', array_column(t_rows("$base WHERE " . implode(!empty($seg['match_all']) ? ' AND ' : ' OR ', $parts), $p), 'id'));
+    }
+    return array_map('intval', array_column(t_rows($sql), 'id'));
+}
+
+/* ---------------- B2B companies ---------------- */
+function company_customer_ids(int $companyId): array
+{
+    return array_map('intval', array_column(t_rows("SELECT customer_id FROM company_contacts WHERE company_id=?", [$companyId]), 'customer_id'));
+}
+function company_stats(int $companyId): array
+{
+    $ids = company_customer_ids($companyId);
+    $in = $ids ? implode(',', $ids) : '0';
+    $o = t_row("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE cancelled_at IS NULL AND (company_id=? OR customer_id IN ($in))", [$companyId]);
+    $d = (int)t_val("SELECT COUNT(*) FROM draft_orders WHERE status<>'completed' AND (company_id=? OR customer_id IN ($in))", [$companyId]);
+    return ['orders' => (int)$o['n'], 'sales' => (float)$o['s'], 'drafts' => $d, 'customer_ids' => $ids];
+}
+
+/* ---------------- marketing / growth ---------------- */
+const MARKETING_SOURCES = ['email', 'social', 'search', 'sms', 'affiliate', 'paid'];
+const TRAFFIC_TYPES = ['direct' => ['Direct', '#3b82d6'], 'organic' => ['Organic search', '#6b4ee0'], 'social' => ['Social', '#1a9e78'], 'email' => ['Email', '#d9822b'], 'referral' => ['Referral', '#c2477f']];
+
+/** Daily series for a range (days) ending today, plus the previous period. */
+function growth_data(int $range): array
+{
+    $today = new DateTimeImmutable('today');
+    $curStart = $today->modify('-' . ($range - 1) . ' days');
+    $prevStart = $curStart->modify("-$range days");
+    $mk = implode(',', array_map(fn($s) => "'$s'", MARKETING_SOURCES));
+    $rows = t_rows("SELECT DATE(created_at) d, COALESCE(SUM(total),0) s,
+        COALESCE(SUM(CASE WHEN source IN ($mk) OR campaign_id IS NOT NULL THEN total ELSE 0 END),0) m
+        FROM orders WHERE cancelled_at IS NULL AND created_at >= ? GROUP BY DATE(created_at)", [$prevStart->format('Y-m-d')]);
+    $by = []; foreach ($rows as $r) $by[$r['d']] = $r;
+    $series = function (DateTimeImmutable $start) use ($by, $range) {
+        $o = ['dates' => [], 'sales' => [], 'marketing' => []];
+        for ($i = 0; $i < $range; $i++) { $d = $start->modify("+$i days")->format('Y-m-d'); $o['dates'][] = $d; $o['sales'][] = (float)($by[$d]['s'] ?? 0); $o['marketing'][] = (float)($by[$d]['m'] ?? 0); }
+        return $o;
+    };
+    $from = $curStart->format('Y-m-d');
+    $traffic = [];
+    foreach (t_rows("SELECT source, SUM(sessions) n FROM traffic_daily WHERE day >= ? GROUP BY source", [$from]) as $r) $traffic[$r['source']] = (int)$r['n'];
+    $bySource = [];
+    foreach (t_rows("SELECT source, COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE cancelled_at IS NULL AND created_at >= ? GROUP BY source", [$from]) as $r) $bySource[$r['source']] = ['orders' => (int)$r['n'], 'sales' => (float)$r['s']];
+    $fmt = fn(DateTimeImmutable $a, DateTimeImmutable $b) => $a->format('M j') . ' – ' . $b->format('M j, Y');
+    return ['cur' => $series($curStart), 'prev' => $series($prevStart), 'traffic' => $traffic, 'bySource' => $bySource,
+        'curLabel' => $fmt($curStart, $today), 'prevLabel' => $fmt($prevStart, $curStart->modify('-1 day')), 'from' => $from];
 }
