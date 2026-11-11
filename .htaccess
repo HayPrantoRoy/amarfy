@@ -1,0 +1,19 @@
+DirectoryIndex index.php
+Options -Indexes
+
+<FilesMatch "\.(sql|sh|bak|log|ini|env|md)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Private folders are never web-served (the /api/... URLs are virtual and go to index.php)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^(config|core|database|views|api)(/|$) - [F,L]
+    # Static files (assets, uploads) are served directly
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+    # Everything else goes through the front controller
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
